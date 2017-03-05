@@ -1,21 +1,25 @@
-#include <dlfcn.h>
-
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <stdlib.h>
-
-#include <sys/types.h>
+/*
+ * Measure stack usage in all spawned threads.
+ *
+ * Compile with:
+ * gcc -Wall -O2 -g -D_GNU_SOURCE -fPIC -shared -pthread -o stackreport.so stackreport.c 
+ *
+ * Use as preloaded lib:
+ * $ SR_OUTPUT_FILE=.../output.txt LD_PRELOAD=.../stackreport.so program args...
+ *
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/mman.h>
 #include <assert.h>
 #include <errno.h>
+#include <dlfcn.h>
+#include <pthread.h>
+#include <sys/mman.h>
+#include <sys/types.h>
 #include <sys/time.h>
 #include <sys/resource.h>
-#include <pthread.h>
 #include <ucontext.h>
 #include <string.h>
 #include <syscall.h>
@@ -46,11 +50,13 @@
 #define ENV_NAME "SR_OUTPUT_FILE"
 #define DUMMY ((void*)0xdeadbeef)
 
+/* globals */
+
 static int (*old_pthread_create)(pthread_t *thread, const pthread_attr_t *attr,
                                  void *(*start_routine) (void *), void *arg);
-
-static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 static unsigned long page_size;
+static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+static FILE *out_file = NULL;
 
 static void *
 aligned(const void *p)
@@ -121,7 +127,7 @@ do_report(FILE *out)
 	fprintf(out, "Stack size          = %lu\n", stack_size);
 	assert(stack_addr && stack_size);
 
-        /* probe for used stack pages */
+        /* report used stack pages */
 
 	assert(!incore(stack_addr));
 	assert(incore(stack_addr + stack_size - page_size));
@@ -133,7 +139,7 @@ do_report(FILE *out)
 	assert(last_used);
 	unsigned long used = stack_addr + stack_size - last_used;
 	fprintf(out, "base = %p lim = %p used = %lu\n",
-	       stack_addr, stack_addr + stack_size, used);
+                stack_addr, stack_addr + stack_size, used);
 
         fputs("\n", out);
 }
@@ -141,19 +147,11 @@ do_report(FILE *out)
 static void
 thread_reporter(void *unused)
 {
-        char *outfile = getenv(ENV_NAME);
-        FILE *out;
-
         pthread_mutex_lock(&mutex);
 
-        if (!outfile) {
-                do_report(stderr);
-        } else {
-                out = fopen(outfile, "a");
-                if (out) {
-                        do_report(out);
-                        fclose(out);
-                }
+        if (out_file) {
+                do_report(out_file);
+                fflush(out_file);
         }
 
         pthread_mutex_unlock(&mutex);
@@ -182,7 +180,7 @@ start_routine_wrapper(void *arg)
 
 int
 pthread_create(pthread_t *thread, const pthread_attr_t *attr,
-                   void *(*start_routine) (void *), void *arg)
+               void *(*start_routine) (void *), void *arg)
 {
         struct wrapper_arg *wrapper_arg;
 
@@ -210,11 +208,10 @@ void __strackreport_init(void)
 	page_size = sysconf(_SC_PAGESIZE);
 	old_pthread_create = get_sym("pthread_create");
 
-        char *outfile = getenv(ENV_NAME);
+        char *out_file_name = getenv(ENV_NAME);
 
-        if (outfile) {
-                FILE *out = fopen(outfile, "w");
-                if (out)
-                        fclose(out);
-        }
+        if (out_file_name)
+                out_file = fopen(out_file_name, "w");
+        else
+                out_file = stderr;
 }
