@@ -4,7 +4,7 @@ CFLAGS := -Wall -O2 -g
 PRELOADS := stackreport.so
 PROGS := testprog
 
-all: $(PRELOADS) $(PROGS)
+all: $(PRELOADS)
 
 stackreport.so: CPPFLAGS += -D_GNU_SOURCE
 stackreport.so: LDFLAGS += -fPIC -shared -pthread
@@ -16,7 +16,7 @@ testprog: LDFLAGS += -pthread
 clean:
 	$(RM) *.o $(PRELOADS) $(PROGS)
 
-check: all
+check: all $(PROGS)
 	(ulimit -s 8192 ; ./testprog.py)
 
 %.so: %.c
