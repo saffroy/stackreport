@@ -104,10 +104,9 @@ do_report(FILE *out)
 {
         /* basic thread info */
 
+        pid_t tid = gettid();
         char name[16+1] = {};
         prctl(PR_GET_NAME, name);
-
-        fprintf(out, "tid %lu \"%s\"\n", (long)gettid(), name);
 
         /* stack info */
 
@@ -122,9 +121,6 @@ do_report(FILE *out)
 	assert(ret == 0);
 	ret = pthread_attr_getguardsize(&attr, &guard_size);
 	assert(ret == 0);
-	fprintf(out, "Guard size          = %lu bytes\n", guard_size);
-	fprintf(out, "Stack address       = %p\n", stack_addr);
-	fprintf(out, "Stack size          = %lu\n", stack_size);
 	assert(stack_addr && stack_size);
 
         /* report used stack pages */
@@ -138,10 +134,13 @@ do_report(FILE *out)
 				  page_size, cmp);
 	assert(last_used);
 	unsigned long used = stack_addr + stack_size - last_used;
-	fprintf(out, "base = %p lim = %p used = %lu\n",
-                stack_addr, stack_addr + stack_size, used);
 
-        fputs("\n", out);
+        /* output report */
+	fprintf(out,
+                "tid %lu name %s stack_addr %p stack_lim %p"
+                " guard_size %lu stack_used %lu\n",
+                (long)tid, name, stack_addr, stack_addr + stack_size,
+                guard_size, used);
 }
 
 static void
