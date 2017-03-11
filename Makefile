@@ -7,7 +7,7 @@ all: $(PRELOADS)
 
 stackreport.so: CPPFLAGS += -D_GNU_SOURCE
 stackreport.so: LDFLAGS += -fPIC -shared -pthread
-stackreport.so: LDLIBS +=
+stackreport.so: LDLIBS += -ldl
 
 clean:
 	$(RM) *.o $(PRELOADS)
