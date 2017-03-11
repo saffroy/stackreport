@@ -190,6 +190,11 @@ pthread_create(pthread_t *thread, const pthread_attr_t *attr,
         struct wrapper_arg *wrapper_arg;
 
         wrapper_arg = malloc(sizeof(*wrapper_arg));
+        if (!wrapper_arg) {
+                errno = EAGAIN;
+                return -1;
+        }
+
         wrapper_arg->start_routine = start_routine;
         wrapper_arg->arg = arg;
 
