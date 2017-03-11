@@ -144,7 +144,7 @@ do_report(FILE *out)
 }
 
 static void
-thread_reporter(void *unused)
+do_report_main(void)
 {
         pthread_mutex_lock(&mutex);
 
@@ -154,6 +154,12 @@ thread_reporter(void *unused)
         }
 
         pthread_mutex_unlock(&mutex);
+}
+
+static void
+thread_reporter(void *unused)
+{
+        do_report_main();
 }
 
 struct wrapper_arg {
@@ -213,4 +219,6 @@ void __strackreport_init(void)
                 out_file = fopen(out_file_name, "w");
         else
                 out_file = stderr;
+
+        atexit(do_report_main);
 }
